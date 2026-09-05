@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>Admin - Fixed Offline</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body{background:#0f0c07;color:#f5e6c8;font-family:sans-serif;margin:0;min-height:100vh;overflow-x:hidden}
+.gold{color:#d4a536}.card{background:#1a160f;border:1px solid #2e2618;border-radius:14px}
+.btn{background:linear-gradient(135deg,#d4a536,#e8c25a);color:#1a1408;font-weight:600;border-radius:10px;padding:12px 20px;border:none;cursor:pointer}
+.btn-danger{background:#b91c1c;color:#fff;border-radius:8px;padding:8px 14px;border:none;cursor:pointer}
+.input{background:#0f0c07;border:1px solid #2e2618;color:#f5e6c8;border-radius:10px;padding:12px 14px;width:100%;outline:none}
+.sidebar-btn{width:100%;text-align:left;padding:12px 14px;border-radius:10px;border:none;background:transparent;color:#a08c6a;cursor:pointer;display:flex;align-items:center;gap:8px}
+.sidebar-btn.active,.sidebar-btn:hover{background:#2e2618;color:#d4a536}
+.hidden{display:none!important}
+.live-dot{width:8px;height:8px;background:#22c55e;border-radius:50%;display:inline-block;animation:pulse 1.5s infinite}
+.live-dot.off{background:#ef4444;animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+#admin-sidebar{width:280px;background:#1a160f;border-right:1px solid #2e2618;transition:transform 0.3s;z-index:60}
+@media(max-width:768px){#admin-sidebar{position:fixed;left:0;top:0;bottom:0;transform:translateX(-100%);box-shadow:4px 0 24px rgba(0,0,0,0.5)}#admin-sidebar.open{transform:translateX(0)}#admin-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:55}}
+@media(min-width:769px){#admin-overlay{display:none!important}#menu-toggle{display:none!important}}
+.table-wrap{overflow-x:auto;border-radius:14px}.table-wrap table{min-width:700px}
+.current-account{background:linear-gradient(145deg,#1e1a12,#14100a);border:1px solid rgba(212,165,54,0.25);border-radius:12px;padding:14px;margin-bottom:16px}
+</style>
+</head><body>
+<div id="admin-login" class="min-h-screen flex items-center justify-center p-4">
+  <div class="card p-6 md:p-8 max-w-sm w-full space-y-5">
+    <h1 class="gold font-bold text-3xl text-center">Admin</h1>
+    <div class="space-y-4">
+      <div><label class="text-xs text-[#a08c6a]">Password</label><input id="admin-pass" type="password" class="input" placeholder="202020" /></div>
+      <button onclick="adminLogin()" class="btn w-full">Login</button>
+      <p id="login-error" class="hidden text-xs text-center p-2 rounded-lg" style="background:rgba(248,113,113,0.1);color:#f87171"></p>
+      <p id="load-error" class="hidden text-[11px] text-center p-2 rounded-lg" style="background:rgba(234,179,8,0.1);color:#eab308"></p>
+    </div>
+  </div>
+</div>
+<div id="admin-app" class="hidden min-h-screen flex">
+  <div id="admin-overlay" class="hidden" onclick="closeSidebar()"></div>
+  <aside id="admin-sidebar" class="flex flex-col p-4 gap-1 overflow-y-auto">
+    <div class="flex justify-between items-center mb-5"><h2 class="gold font-bold text-lg flex items-center gap-2">Admin <span class="live-dot" id="live-dot"></span></h2><button onclick="closeSidebar()" class="md:hidden text-[#a08c6a] text-xl">✕</button></div>
+    <button onclick="showAdminSection('dashboard')" class="sidebar-btn active" data-sec="dashboard">📊 Dashboard</button>
+    <button onclick="showAdminSection('customers')" class="sidebar-btn" data-sec="customers">👥 Customers</button>
+    <button onclick="showAdminSection('withdraws')" class="sidebar-btn" data-sec="withdraws">💸 Withdraws</button>
+    <button onclick="showAdminSection('payment')" class="sidebar-btn" data-sec="payment">🏦 Payment Account</button>
+    <button onclick="showAdminSection('whatsapp')" class="sidebar-btn" data-sec="whatsapp">💬 WhatsApp</button>
+    <button onclick="showAdminSection('telegram')" class="sidebar-btn" data-sec="telegram">✈ Telegram</button>
+    <button onclick="showAdminSection('channel')" class="sidebar-btn" data-sec="channel">📢 Channel</button>
+    <button onclick="showAdminSection('settings')" class="sidebar-btn" data-sec="settings">⚙ Settings</button>
+    <button onclick="adminLogout()" class="sidebar-btn mt-auto text-red-400">🚪 Logout</button>
+  </aside>
+  <div class="flex-1 flex flex-col min-h-screen min-w-0">
+    <header class="bg-[#1a160f] border-b border-[#2e2618] p-3 flex justify-between items-center sticky top-0 z-40">
+      <div class="flex items-center gap-3"><button id="menu-toggle" onclick="toggleSidebar()" class="p-2 rounded-lg bg-[#2e2618] text-[#d4a536]">☰</button><span id="page-title" class="gold font-semibold text-sm md:text-base">Dashboard</span></div>
+      <div class="flex items-center gap-2"><button id="retry-btn" onclick="loadData(true)" class="text-[11px] px-2 py-1 rounded bg-[#2e2618] text-[#d4a536]">Retry</button><span id="sync-status" class="text-[11px] md:text-xs text-[#a08c6a]">Connecting...</span><span id="live-dot-h" class="live-dot"></span></div>
+    </header>
+    <main class="p-3 md:p-4 flex-1 bg-[#0f0c07]">
+      <div id="sec-dashboard"><div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-4"><div class="card p-4 md:p-5"><p class="text-xs text-[#a08c6a]">Total Customers</p><p id="stat-users" class="text-3xl font-bold gold mt-1">0</p></div><div class="card p-4 md:p-5"><p class="text-xs text-[#a08c6a]">Total Balance Held</p><p id="stat-balance" class="text-2xl gold">₦0</p></div><div class="card p-4 md:p-5"><p class="text-xs text-[#a08c6a]">Pending Withdraws</p><p id="stat-pending" class="text-2xl gold">0</p></div></div><div class="card p-3 md:p-4"><h3 class="font-bold mb-2">Recent Signups</h3><div id="recent-users" class="space-y-2 text-xs"></div><p id="dashboard-msg" class="hidden text-[11px] mt-2 p-2 rounded" style="background:rgba(234,179,8,0.1);color:#eab308"></p></div></div>
+      <div id="sec-customers" class="hidden"><div class="flex justify-between items-center gap-2 mb-3"><h3 class="font-bold">All Customers</h3><button onclick="loadData(true).then(()=>{renderCustomers();renderDashboard();})" class="btn text-xs" style="padding:8px 12px">🔄 Refresh</button></div><div class="card table-wrap"><table class="w-full text-xs"><thead class="border-b border-[#2e2618] text-[#a08c6a]"><tr><th class="p-2 text-left">Name</th><th class="p-2 text-left">Email</th><th class="p-2 text-left">Balance</th><th class="p-2 text-left">Refs</th><th class="p-2 text-left">Code</th><th class="p-2 text-left">Joined</th><th class="p-2 text-left">Action</th></tr></thead><tbody id="customers-table"></tbody></table></div></div>
+      <div id="sec-customer-detail" class="hidden"><div class="flex items-center gap-3 mb-4"><button onclick="closeCustomerDetail()" class="btn text-xs" style="padding:8px 12px">← Back</button><h3 class="font-bold gold">Customer Management</h3></div><div class="grid grid-cols-1 lg:grid-cols-3 gap-4"><div class="card p-4 space-y-2"><h4 class="font-bold gold text-sm">Customer Info</h4><p class="text-xs"><span class="text-[#a08c6a]">Name:</span> <span id="detail-name"></span></p><p class="text-xs break-all"><span class="text-[#a08c6a]">Email:</span> <span id="detail-email"></span></p><p class="text-xs"><span class="text-[#a08c6a]">Code:</span> <span id="detail-code" class="font-mono text-[11px]"></span></p><p class="text-xs"><span class="text-[#a08c6a]">Joined:</span> <span id="detail-joined"></span></p><p class="text-xs"><span class="text-[#a08c6a]">Referrals:</span> <span id="detail-refs"></span></p></div><div class="card p-4 space-y-3"><h4 class="font-bold gold text-sm">Balances</h4><div class="bg-[#0f0c07] rounded-xl p-3 border border-[#2e2618]"><p class="text-[11px] text-[#a08c6a]">Current Balance</p><p id="detail-balance" class="text-xl font-bold gold"></p></div><div class="bg-[#0f0c07] rounded-xl p-3 border border-[#2e2618]"><p class="text-[11px] text-[#a08c6a]">Total Earnings</p><p id="detail-earned" class="text-lg font-bold" style="color:#4ade80"></p></div><div class="bg-[#0f0c07] rounded-xl p-3 border border-[#2e2618] max-h-[180px] overflow-auto"><p class="text-[11px] text-[#a08c6a] mb-2">Recent Transactions</p><div id="detail-tx" class="space-y-1 text-[11px]"></div></div></div><div class="card p-4 space-y-3"><h4 class="font-bold gold text-sm">Credit / Deduct</h4><div><label class="text-[11px] text-[#a08c6a]">Amount (₦)</label><input id="detail-amount" type="number" class="input mt-1" placeholder="30000" /></div><div><label class="text-[11px] text-[#a08c6a]">Memo</label><input id="detail-memo" type="text" class="input mt-1" placeholder="Earnings" /></div><div class="grid grid-cols-2 gap-2 pt-1"><button onclick="creditCustomer()" class="btn text-xs" style="background:linear-gradient(135deg,#22c55e,#4ade80);color:#052e16;">+ Credit</button><button onclick="deductCustomer()" class="btn-danger text-xs" style="padding:12px;">- Deduct</button></div><p id="detail-msg" class="hidden text-[11px] p-2 rounded-lg"></p></div></div></div>
+      <div id="sec-withdraws" class="hidden"><div class="card table-wrap"><table class="w-full text-xs"><thead class="border-b border-[#2e2618] text-[#a08c6a]"><tr><th class="p-2 text-left">Customer</th><th class="p-2 text-left">Amount</th><th class="p-2 text-left">Bank</th><th class="p-2 text-left">Account</th><th class="p-2 text-left">Date</th><th class="p-2 text-left">Status</th><th class="p-2 text-left">Action</th></tr></thead><tbody id="withdraws-table"></tbody></table></div></div>
+      <div id="sec-payment" class="hidden"><div class="card p-4 md:p-6 max-w-lg space-y-4"><h2 class="gold font-bold">Payment Account - Live to Frontend</h2><p class="text-[11px] text-[#a08c6a]">New replaces old instantly, old deleted.</p><div id="current-payment-preview" class="current-account"><p class="text-[11px] text-[#a08c6a] mb-2">Currently Live:</p><p class="text-sm"><span class="text-[#a08c6a]">Name:</span> <span id="cur-accname">-</span></p><p class="text-sm"><span class="text-[#a08c6a]">Number:</span> <span id="cur-accnum">-</span></p><p class="text-sm"><span class="text-[#a08c6a]">Bank:</span> <span id="cur-bankname">-</span></p></div><input id="set-accname" class="input" placeholder="Account Name"/><input id="set-accnum" class="input" placeholder="Account Number"/><input id="set-bankname" class="input" placeholder="Bank Name"/><button onclick="savePaymentAccount()" class="btn w-full text-sm">💾 Save & Replace Old</button><p id="pay-saved" class="hidden text-sm text-center p-2 rounded-lg"></p></div></div>
+      <div id="sec-whatsapp" class="hidden"><div class="card p-4 max-w-lg space-y-4"><h2 class="gold font-bold">WhatsApp</h2><input id="set-whatsapp" class="input" placeholder="https://wa.me/..."/><button onclick="saveWhatsapp()" class="btn w-full">Save</button><p id="wa-saved" class="hidden text-green-400 text-sm text-center"></p></div></div>
+      <div id="sec-telegram" class="hidden"><div class="card p-4 max-w-lg space-y-4"><h2 class="gold font-bold">Telegram</h2><input id="set-telegram" class="input" placeholder="https://t.me/..."/><button onclick="saveTelegram()" class="btn w-full">Save</button><p id="tg-saved" class="hidden text-green-400 text-sm text-center"></p></div></div>
+      <div id="sec-channel" class="hidden"><div class="card p-4 max-w-lg space-y-4"><h2 class="gold font-bold">Channel</h2><input id="set-channel" class="input" placeholder="https://t.me/..."/><button onclick="saveChannel()" class="btn w-full">Save</button><p id="ch-saved" class="hidden text-green-400 text-sm text-center"></p></div></div>
+      <div id="sec-settings" class="hidden"><div class="card p-4 max-w-lg space-y-4"><h2 class="gold font-bold">Change Password</h2><input id="set-old-pass" type="password" class="input" placeholder="Current"/><input id="set-new-pass" type="password" class="input" placeholder="New"/><input id="set-new-pass2" type="password" class="input" placeholder="Confirm"/><button onclick="changeAdminPassword()" class="btn w-full">Update</button><p id="settings-msg" class="hidden text-sm text-center p-2 rounded-lg"></p></div></div>
+    </main>
+  </div>
+</div>
+<script>
+const BIN_ID='6a9b0f99da38895dfe399c73';
+const ACCESS_KEY='$2a$10$pqInp3O8CbNngOF0Y2rFW.oI0uk/xVUoGuGjUgpwFMFgRlhY8pAGS';
+const MASTER_KEY='$2a$10$hmXdJoo8tCS.xYXR1iTV9O8YoeagMRUQmupeveyJUy.p81Xg5bQe6hWz8K9l0M1n2O3p4Q5r6S7t8U9v0';
+const BIN_URL=`https://api.jsonbin.io/v3/b/${BIN_ID}`;
+const DEFAULT_ADMIN_PASS='202020';
+let appData={users:[],settings:{},withdrawals:[]};
+let currentAdminPass=localStorage.getItem('gf_admin_pass')||DEFAULT_ADMIN_PASS;
+let adminSyncInterval=null;let selectedCustomerId=null;let adminIdleTimer=null;
+const ADMIN_IDLE_TIMEOUT=2*60*1000;
+function toggleSidebar(){document.getElementById('admin-sidebar').classList.toggle('open');document.getElementById('admin-overlay').classList.toggle('hidden');}
+function closeSidebar(){document.getElementById('admin-sidebar').classList.remove('open');document.getElementById('admin-overlay').classList.add('hidden');}
+function setStatus(text,isLive){
+  const el=document.getElementById('sync-status');const dot=document.getElementById('live-dot');const dotH=document.getElementById('live-dot-h');const retry=document.getElementById('retry-btn');
+  if(el) el.textContent=text;
+  if(dot) dot.className=isLive?'live-dot':'live-dot off';
+  if(dotH) dotH.className=isLive?'live-dot':'live-dot off';
+  if(retry) retry.style.display=isLive?'none':'inline-block';
+}
+async function loadData(forceRetry=false){
+  if(forceRetry) setStatus('Retrying...',false); else setStatus('Connecting...',false);
+  let rec=null;let err='';
+  try{
+    let r=await fetch(BIN_URL+'/latest',{headers:{'X-Access-Key':ACCESS_KEY},cache:'no-store'});
+    if(!r.ok){console.log('AccessKey failed '+r.status); throw new Error('AccessKey '+r.status);}
+    const j=await r.json();rec=j.record||j;
+  }catch(e1){
+    err='AccessKey:'+e1.message;
+    try{
+      let r2=await fetch(BIN_URL+'/latest',{headers:{'X-Master-Key':MASTER_KEY,'X-Access-Key':ACCESS_KEY},cache:'no-store'});
+      if(!r2.ok) throw new Error('Master '+r2.status);
+      const j2=await r2.json();rec=j2.record||j2;
+    }catch(e2){err+=' | Master:'+e2.message;}
+  }
+  if(rec){
+    appData={users:rec.users||[],withdrawals:rec.withdrawals||[],settings:rec.settings||{whatsapp:'https://wa.me/2348148103620',telegram:'https://t.me/goldfortune01',telegramChannel:'https://t.me/goldfortune01',bankAccount:'1848130535',bankName:'Smartcash',accountName:'Blessing Asuquo',adminPassword:DEFAULT_ADMIN_PASS},products:rec.products||[]};
+    if(appData.settings.adminPassword){currentAdminPass=appData.settings.adminPassword;localStorage.setItem('gf_admin_pass',currentAdminPass);}
+    localStorage.setItem('gf_last_data',JSON.stringify(appData));localStorage.setItem('gf_last_sync',new Date().toISOString());
+    setStatus('Live • '+new Date().toLocaleTimeString(),true);updatePaymentPreview();
+    document.getElementById('load-error')?.classList.add('hidden');
+    document.getElementById('dashboard-msg')?.classList.add('hidden');
+    return true;
+  }else{
+    const backup=localStorage.getItem('gf_last_data');
+    if(backup){
+      try{
+        const b=JSON.parse(backup);
+        appData={users:b.users||[],withdrawals:b.withdrawals||[],settings:b.settings||{},products:b.products||[]};
+        if(appData.settings.adminPassword) currentAdminPass=appData.settings.adminPassword;
+        setStatus('Offline • cached',false);
+        const dm=document.getElementById('dashboard-msg');
+        if(dm){dm.textContent='⚠️ Offline - showing cached data | Error:'+err+' | Tap Retry';dm.classList.remove('hidden');}
+        updatePaymentPreview();return false;
+      }catch{}
+    }
+    setStatus('Offline • '+err,false);
+    const le=document.getElementById('load-error');
+    if(le){le.textContent='Failed: '+err+' | Check internet';le.classList.remove('hidden');}
+    return false;
+  }
+}
+function updatePaymentPreview(){const s=appData.settings||{};const a=document.getElementById('cur-accname');const b=document.getElementById('cur-accnum');const c=document.getElementById('cur-bankname');if(a) a.textContent=s.accountName||'-';if(b) b.textContent=s.bankAccount||'-';if(c) c.textContent=s.bankName||'-';}
+async function saveData(){
+  try{
+    let r=await fetch(BIN_URL,{method:'PUT',headers:{'Content-Type':'application/json','X-Master-Key':MASTER_KEY,'X-Access-Key':ACCESS_KEY},body:JSON.stringify(appData)});
+    if(r.ok){localStorage.setItem('gf_last_data',JSON.stringify(appData));return true;}
+    r=await fetch(BIN_URL,{method:'PUT',headers:{'Content-Type':'application/json','X-Access-Key':ACCESS_KEY},body:JSON.stringify(appData)});
+    if(r.ok){localStorage.setItem('gf_last_data',JSON.stringify(appData));return true;}
+    return false;
+  }catch{return false;}
+}
+function adminLogin(){
+  const pass=document.getElementById('admin-pass').value.trim();
+  const errEl=document.getElementById('login-error');
+  loadData().then(ok=>{
+    if(!ok && !localStorage.getItem('gf_last_data')){errEl.textContent='Cannot connect - check internet';errEl.classList.remove('hidden');return;}
+    if(pass===currentAdminPass){
+      document.getElementById('admin-login').classList.add('hidden');
+      document.getElementById('admin-app').classList.remove('hidden');
+      showAdminSection('dashboard');fillSettingsForms();startAdminSync();initAdminIdle();
+      errEl.classList.add('hidden');
+    }else{errEl.textContent='Incorrect - try 202020';errEl.classList.remove('hidden');}
+  });
+}
+document.getElementById('admin-pass')?.addEventListener('keydown',e=>{if(e.key==='Enter') adminLogin();});
+function adminLogout(){if(adminSyncInterval) clearInterval(adminSyncInterval);if(adminIdleTimer) clearTimeout(adminIdleTimer);document.getElementById('admin-app').classList.add('hidden');document.getElementById('admin-login').classList.remove('hidden');closeSidebar();}
+function startAdminSync(){if(adminSyncInterval) clearInterval(adminSyncInterval);adminSyncInterval=setInterval(async()=>{await loadData();const active=document.querySelector('.sidebar-btn.active')?.dataset.sec;if(active==='dashboard') renderDashboard();if(active==='customers') renderCustomers();if(active==='withdraws') renderWithdraws();if(active==='payment') updatePaymentPreview();},8000);}
+function adminIdleLogout(){const app=document.getElementById('admin-app');if(app && !app.classList.contains('hidden')){alert('Session expired');adminLogout();}}
+function resetAdminIdle(){if(adminIdleTimer) clearTimeout(adminIdleTimer);adminIdleTimer=setTimeout(adminIdleLogout,ADMIN_IDLE_TIMEOUT);}
+function initAdminIdle(){['mousemove','mousedown','keydown','touchstart','scroll','click'].forEach(e=>document.addEventListener(e,resetAdminIdle,{passive:true}));resetAdminIdle();}
+function showAdminSection(sec){resetAdminIdle();document.querySelectorAll('[id^="sec-"]').forEach(e=>e.classList.add('hidden'));document.getElementById('sec-'+sec)?.classList.remove('hidden');document.querySelectorAll('.sidebar-btn').forEach(b=>b.classList.toggle('active',b.dataset.sec===sec));document.getElementById('page-title').textContent=sec.charAt(0).toUpperCase()+sec.slice(1);if(sec==='dashboard') renderDashboard();if(sec==='customers'){selectedCustomerId=null;renderCustomers();}if(sec==='withdraws') renderWithdraws();if(['payment','whatsapp','telegram','channel','settings'].includes(sec)) fillSettingsForms();if(window.innerWidth<=768) closeSidebar();}
+function openCustomerDetail(id){selectedCustomerId=id;document.querySelectorAll('[id^="sec-"]').forEach(e=>e.classList.add('hidden'));document.getElementById('sec-customer-detail').classList.remove('hidden');document.querySelectorAll('.sidebar-btn').forEach(b=>b.classList.remove('active'));document.getElementById('page-title').textContent='Customer';renderCustomerDetail();resetAdminIdle();if(window.innerWidth<=768) closeSidebar();}
+function closeCustomerDetail(){selectedCustomerId=null;showAdminSection('customers');}
+function renderCustomerDetail(){const u=(appData.users||[]).find(x=>x.id===selectedCustomerId);if(!u){document.getElementById('detail-name').textContent='Not found';return;}document.getElementById('detail-name').textContent=u.fullName||'-';document.getElementById('detail-email').textContent=u.email||'-';document.getElementById('detail-code').textContent=u.referralCode||'-';document.getElementById('detail-joined').textContent=u.createdAt?new Date(u.createdAt).toLocaleString():'-';document.getElementById('detail-refs').textContent=(u.referrals||[]).length;document.getElementById('detail-balance').textContent='₦'+Number(u.balance||0).toLocaleString();document.getElementById('detail-earned').textContent='₦'+Number(u.totalEarned||0).toLocaleString();const tx=(u.transactions||[]).slice(0,10);document.getElementById('detail-tx').innerHTML=tx.length?tx.map(t=>{const isC=Number(t.amount)>=0;const col=isC?'#4ade80':'#f87171';const sign=isC?'+':'-';return `<div class="flex justify-between py-1.5 border-b border-[#2e2618]/50"><span class="truncate pr-2 text-[11px]">${t.note||t.type}</span><span style="color:${col}" class="font-semibold text-[11px]">${sign}₦${Math.abs(Number(t.amount)).toLocaleString()}</span></div>`;}).join(''):'<p class="text-[#a08c6a] text-xs">No transactions</p>';}
+async function creditCustomer(){const amt=Number(document.getElementById('detail-amount').value);const memo=document.getElementById('detail-memo').value.trim()||'Earnings';const msg=document.getElementById('detail-msg');if(!selectedCustomerId||!amt||amt<=0){msg.textContent='Enter amount';msg.classList.remove('hidden');msg.style.background='rgba(248,113,113,0.1)';msg.style.color='#f87171';return;}const u=appData.users.find(x=>x.id===selectedCustomerId);if(!u) return;u.balance=(u.balance||0)+amt;u.totalEarned=(u.totalEarned||0)+amt;u.transactions=u.transactions||[];u.transactions.unshift({type:'credit',amount:amt,note:memo,date:new Date().toISOString(),by:'admin'});const ok=await saveData();msg.textContent=ok?`✓ Credited ₦${amt.toLocaleString()} as ${memo}`:`Credited locally - will sync`;msg.classList.remove('hidden');msg.style.background='rgba(74,222,128,0.1)';msg.style.color='#4ade80';document.getElementById('detail-amount').value='';document.getElementById('detail-memo').value='';renderCustomerDetail();renderCustomers();renderDashboard();setTimeout(()=>msg.classList.add('hidden'),4000);}
+async function deductCustomer(){const amt=Number(document.getElementById('detail-amount').value);const memo=document.getElementById('detail-memo').value.trim()||'Deduction';const msg=document.getElementById('detail-msg');if(!selectedCustomerId||!amt||amt<=0){msg.textContent='Enter amount';msg.classList.remove('hidden');return;}const u=appData.users.find(x=>x.id===selectedCustomerId);if(!u) return;if((u.balance||0)<amt && !confirm(`Balance ₦${u.balance} less than ₦${amt}. Deduct?`)) return;u.balance=(u.balance||0)-amt;u.transactions=u.transactions||[];u.transactions.unshift({type:'deduct',amount:-amt,note:memo,date:new Date().toISOString(),by:'admin'});const ok=await saveData();msg.textContent=ok?`✓ Deducted ₦${amt.toLocaleString()}`:`Deducted locally`;msg.classList.remove('hidden');msg.style.background='rgba(248,113,113,0.1)';msg.style.color='#f87171';document.getElementById('detail-amount').value='';document.getElementById('detail-memo').value='';renderCustomerDetail();renderCustomers();renderDashboard();setTimeout(()=>msg.classList.add('hidden'),4000);}
+function fillSettingsForms(){const s=appData.settings||{};document.getElementById('set-accname').value=s.accountName||'';document.getElementById('set-accnum').value=s.bankAccount||'';document.getElementById('set-bankname').value=s.bankName||'';document.getElementById('set-whatsapp').value=s.whatsapp||'';document.getElementById('set-telegram').value=s.telegram||'';document.getElementById('set-channel').value=s.telegramChannel||'';updatePaymentPreview();}
+function renderDashboard(){document.getElementById('stat-users').textContent=(appData.users||[]).length;document.getElementById('stat-balance').textContent='₦'+(appData.users||[]).reduce((s,u)=>s+(u.balance||0),0).toLocaleString();document.getElementById('stat-pending').textContent=(appData.withdrawals||[]).filter(w=>w.status==='pending').length;const recent=[...appData.users].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).slice(0,12);document.getElementById('recent-users').innerHTML=recent.length?recent.map(u=>`<div class="flex justify-between py-2 border-b border-[#2e2618] gap-1"><span class="truncate text-xs">${u.fullName} - ${u.email}</span><span class="text-[#a08c6a] text-[11px]">${new Date(u.createdAt).toLocaleString()}</span></div>`).join(''):'<p class="text-[#a08c6a] text-xs">No customers yet</p>';}
+function renderCustomers(){document.getElementById('customers-table').innerHTML=(appData.users||[]).map(u=>`<tr class="border-b border-[#2e2618]"><td class="p-2 text-xs">${u.fullName||'-'}</td><td class="p-2 text-[#a08c6a] text-[11px] max-w-[120px] truncate">${u.email||'-'}</td><td class="p-2 gold font-semibold text-xs">₦${(u.balance||0).toLocaleString()}</td><td class="p-2 text-xs">${(u.referrals||[]).length}</td><td class="p-2 font-mono text-[10px]">${u.referralCode||'-'}</td><td class="p-2 text-[#a08c6a] text-[11px]">${u.createdAt?new Date(u.createdAt).toLocaleDateString():'-'}</td><td class="p-2 flex gap-1"><button class="btn text-[10px]" style="padding:5px 8px;font-size:10px" onclick="openCustomerDetail('${u.id}')">Manage</button><button class="btn-danger text-[10px]" style="padding:5px 6px" onclick="deleteCustomer('${u.id}')">Del</button></td></tr>`).join('')||'<tr><td colspan=7 class="p-4 text-center text-[#a08c6a] text-xs">No customers</td></tr>';}
+async function deleteCustomer(id){if(!confirm('Delete?')) return;appData.users=appData.users.filter(u=>u.id!==id);appData.withdrawals=appData.withdrawals.filter(w=>w.userId!==id);await saveData();renderCustomers();renderDashboard();}
+async function savePaymentAccount(){const accName=document.getElementById('set-accname').value.trim();const accNum=document.getElementById('set-accnum').value.trim();const bankName=document.getElementById('set-bankname').value.trim();const msg=document.getElementById('pay-saved');if(!accName||!accNum||!bankName){msg.textContent='Fill all fields';msg.classList.remove('hidden');msg.style.background='rgba(248,113,113,0.1)';msg.style.color='#f87171';return;}if(!confirm(`Replace with:\n${accName}\n${accNum}\n${bankName}\n\nOld DELETED?`)) return;appData.settings=appData.settings||{};appData.settings.accountName=accName;appData.settings.bankAccount=accNum;appData.settings.bankName=bankName;appData.settings.paymentUpdatedAt=new Date().toISOString();const ok=await saveData();msg.classList.remove('hidden');if(ok){msg.textContent=`✓ Saved! ${bankName} - ${accNum} LIVE in 8s`;msg.style.background='rgba(74,222,128,0.15)';msg.style.color='#4ade80';updatePaymentPreview();}else{msg.textContent='Saved locally - will sync when online';msg.style.background='rgba(234,179,8,0.15)';msg.style.color='#eab308';}setTimeout(()=>msg.classList.add('hidden'),5000);}
+async function saveWhatsapp(){appData.settings.whatsapp=document.getElementById('set-whatsapp').value.trim();const ok=await saveData();const el=document.getElementById('wa-saved');el.classList.remove('hidden');el.textContent=ok?'✓ Saved':'✓ Saved locally';setTimeout(()=>el.classList.add('hidden'),3000);}
+async function saveTelegram(){appData.settings.telegram=document.getElementById('set-telegram').value.trim();const ok=await saveData();const el=document.getElementById('tg-saved');el.classList.remove('hidden');el.textContent=ok?'✓ Saved':'✓ Saved locally';setTimeout(()=>el.classList.add('hidden'),3000);}
+async function saveChannel(){appData.settings.telegramChannel=document.getElementById('set-channel').value.trim();const ok=await saveData();const el=document.getElementById('ch-saved');el.classList.remove('hidden');el.textContent=ok?'✓ Saved':'✓ Saved locally';setTimeout(()=>el.classList.add('hidden'),3000);}
+function renderWithdraws(){document.getElementById('withdraws-table').innerHTML=[...appData.withdrawals||[]].sort((a,b)=>new Date(b.date)-new Date(a.date)).map(w=>`<tr class="border-b border-[#2e2618]"><td class="p-2"><div class="font-medium text-xs">${w.userName||'-'}</div><div class="text-[11px] text-[#a08c6a] truncate max-w-[100px]">${w.userEmail||''}</div></td><td class="p-2 gold font-semibold text-xs">₦${Number(w.amount||0).toLocaleString()}</td><td class="p-2 text-[11px]">${w.bank?.bankName||'-'}</td><td class="p-2 text-[11px]"><div>${w.bank?.accountNumber||'-'}</div><div class="text-[10px] text-[#a08c6a]">${w.bank?.accountName||''}</div></td><td class="p-2 text-[10px] text-[#a08c6a]">${w.date?new Date(w.date).toLocaleDateString():'-'}</td><td class="p-2 text-[11px]" style="color:${w.status==='pending'?'#eab308':w.status==='approved'?'#4ade80':'#f87171'}">${w.status}</td><td class="p-2">${w.status==='pending'?`<button class="btn text-[10px]" style="padding:4px 8px;font-size:10px" onclick="approveWithdraw('${w.id}')">Ok</button><button class="btn-danger text-[10px]" style="padding:4px 6px" onclick="declineWithdraw('${w.id}')">X</button>`:`<span class="text-[10px]">${w.status}</span>`}</td></tr>`).join('')||'<tr><td colspan=7 class="p-4 text-center text-[#a08c6a] text-xs">No withdraws</td></tr>';}
+async function approveWithdraw(id){const w=appData.withdrawals.find(x=>x.id===id);if(!w||w.status!=='pending') return;if(!confirm(`Approve ₦${Number(w.amount).toLocaleString()}?`)) return;w.status='approved';const u=appData.users.find(x=>x.id===w.userId);if(u){const tx=(u.transactions||[]).find(t=>t.withdrawId===id);if(tx){tx.status='approved';tx.note='Withdrawal successful';}}await saveData();renderWithdraws();}
+async function declineWithdraw(id){const w=appData.withdrawals.find(x=>x.id===id);if(!w||w.status!=='pending') return;if(!confirm(`Decline and refund ₦${Number(w.amount).toLocaleString()}?`)) return;w.status='declined';const u=appData.users.find(x=>x.id===w.userId);if(u){u.balance=(u.balance||0)+Number(w.amount);const tx=(u.transactions||[]).find(t=>t.withdrawId===id);if(tx){tx.status='declined';tx.note='Refunded - Declined';tx.amount=Number(w.amount);}else{u.transactions.unshift({type:'refund',amount:Number(w.amount),note:'Refunded - Declined',status:'declined',withdrawId:id,date:new Date().toISOString()});}}await saveData();renderWithdraws();}
+async function changeAdminPassword(){const oldP=document.getElementById('set-old-pass').value;const newP=document.getElementById('set-new-pass').value;const newP2=document.getElementById('set-new-pass2').value;const m=document.getElementById('settings-msg');m.classList.remove('hidden');if(!oldP||!newP||!newP2){m.textContent='Fill all fields';m.style.background='rgba(248,113,113,0.1)';m.style.color='#f87171';return;}if(oldP!==currentAdminPass){m.textContent='Current incorrect';m.style.background='rgba(248,113,113,0.1)';m.style.color='#f87171';return;}if(newP!==newP2){m.textContent='No match';m.style.background='rgba(248,113,113,0.1)';m.style.color='#f87171';return;}appData.settings.adminPassword=newP;currentAdminPass=newP;localStorage.setItem('gf_admin_pass',newP);const ok=await saveData();m.textContent=ok?'✓ Changed':'✓ Changed locally';m.style.background='rgba(74,222,128,0.1)';m.style.color='#4ade80';document.getElementById('set-old-pass').value='';document.getElementById('set-new-pass').value='';document.getElementById('set-new-pass2').value='';setTimeout(()=>m.classList.add('hidden'),4000);}
+document.addEventListener('DOMContentLoaded',()=>{loadData();});
+</script>
+</body></html>
